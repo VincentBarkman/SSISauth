@@ -24,8 +24,7 @@ import {
 import { DiscoveryCache } from "./discovery.js";
 import { verifyIdToken } from "./verify.js";
 
-const DEFAULT_ISSUER =
-  "https://authentication-git-authentication.apps.okd.ssis.nu";
+const DEFAULT_ISSUER = "https://elevkar-auth.ssis.nu";
 const DEFAULT_SCOPES = ["openid", "profile", "email"];
 
 function buildEndpoints(issuer: string) {
@@ -48,7 +47,6 @@ async function exchangeCode(
     codeVerifier: string;
     clientId: string;
     clientSecret?: string;
-    issuer: string;
   }
 ): Promise<TokenResponse> {
   const body = new URLSearchParams({
@@ -68,7 +66,6 @@ async function exchangeCode(
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
-      Origin: params.issuer,
     },
     body: body.toString(),
   });
@@ -188,7 +185,6 @@ export function createOAuthClient(config: AuthConfig) {
       codeVerifier: pkce.codeVerifier,
       clientId,
       clientSecret,
-      issuer,
     });
 
     const expiresAt =

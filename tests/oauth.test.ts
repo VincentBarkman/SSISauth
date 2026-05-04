@@ -3,8 +3,7 @@ import { createOAuthClient } from "../src/oauth.js";
 import { savePKCEState } from "../src/storage.js";
 import type { PKCEState } from "../src/types.js";
 
-const BASE_ISSUER =
-  "https://authentication-git-authentication.apps.okd.ssis.nu";
+const BASE_ISSUER = "https://elevkar-auth.ssis.nu";
 const TOKEN_URL = `${BASE_ISSUER}/api/auth/oauth2/token`;
 const USERINFO_URL = `${BASE_ISSUER}/api/auth/oauth2/userinfo`;
 
@@ -13,6 +12,7 @@ function makeConfig(overrides = {}) {
     secrets: { clientId: "test-client-id", clientSecret: "test-secret" },
     scopes: ["openid", "profile", "email"],
     discover: false,
+    issuer: BASE_ISSUER,
     ...overrides,
   };
 }
@@ -184,6 +184,81 @@ describe("createOAuthClient", () => {
 
       const auth = createOAuthClient(makeConfig());
       await expect(auth.initialize()).rejects.toThrow(/code expired/i);
+    });
+
+    it("throws on invalid_client error from the token endpoint", async () => {
+      setUrl(`http://localhost:3000/?code=bad-code&state=test-state`);
+      setPKCEState({ state: "test-state" });
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValueOnce({
+          ok: false,
+          json: async () => ({
+            error: "invalid_client",
+            error_description: "Client authentication failed",
+          }),
+        })
+      );
+
+      const auth = createOAuthClient(makeConfig());
+      await expect(auth.initialize()).rejects.toThrow(/client authentication failed/i);
+    });
+
+    it("sends the token request to the correct endpoint URL", async () => {
+      setUrl(`http://localhost:3000/?code=auth-code-abc&state=test-state`);
+      setPKCEState({ state: "test-state" });
+
+      const fetchMock = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockTokenResponse(),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const auth = createOAuthClient(makeConfig());
+      await auth.initialize();
+
+      expect(fetchMock).toHaveBeenCalledWith(TOKEN_URL, expect.any(Object));
+    });
+
+    it("sends correct body params in the token request", async () => {
+      setUrl(`http://localhost:3000/?code=auth-code-abc&state=test-state`);
+      setPKCEState({ state: "test-state" });
+
+      const fetchMock = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockTokenResponse(),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const auth = createOAuthClient(makeConfig());
+      await auth.initialize();
+
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const body = new URLSearchParams(init.body as string);
+      expect(body.get("grant_type")).toBe("authorization_code");
+      expect(body.get("client_id")).toBe("test-client-id");
+      expect(body.get("code")).toBe("auth-code-abc");
+      expect(body.get("redirect_uri")).toBe("http://localhost:3000/callback");
+      expect(body.get("code_verifier")).toBe("test-verifier");
+    });
+
+    it("does not send a spoofed Origin header in the token request", async () => {
+      setUrl(`http://localhost:3000/?code=auth-code-abc&state=test-state`);
+      setPKCEState({ state: "test-state" });
+
+      const fetchMock = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockTokenResponse(),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const auth = createOAuthClient(makeConfig());
+      await auth.initialize();
+
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const headers = init.headers as Record<string, string>;
+      expect(headers["Origin"]).toBeUndefined();
     });
 
     it("cleans code and state from the URL after exchange", async () => {

@@ -5,7 +5,7 @@ import {
   DiscoveryCache,
 } from "../src/discovery.js";
 
-const ISSUER = "https://authentication-git-authentication.apps.okd.ssis.nu";
+const ISSUER = "https://elevkar-auth.ssis.nu";
 
 const mockOIDCConfig = {
   issuer: ISSUER,

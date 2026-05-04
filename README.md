@@ -5,13 +5,13 @@ OAuth 2.1 Authorization Code + PKCE-klientbibliotek för SSIS.
 ## Installation
 
 ```bash
-npm install ssisauth
+npm install @ssis/ssisauth
 ```
 
 ## Snabbstart
 
 ```ts
-import { ssisauth } from "ssisauth";
+import { ssisauth } from "@ssis/ssisauth";
 
 const auth = ssisauth({
   secrets: {
